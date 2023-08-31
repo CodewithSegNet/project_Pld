@@ -146,7 +146,7 @@ def update_user(username):
     if user:
         # Update user data based on incoming JSON data
         cursor.execute("UPDATE users SET first_name = %s, middle_name = %s, last_name = %s, grad_year = %s WHERE username = %s",
-                data['first_name'], data['middle_name'], data['last_name'], data['grad_year'], username))
+                (data['first_name'], data['middle_name'], data['last_name'], data['grad_year'], username))
         conn.commit()
         cursor.close()
         conn.close()
@@ -160,7 +160,7 @@ def update_user(username):
 
 # route that handles deleting of user data based on username
 @app.route('/users/<username>', methods=['DELETE'])
-def del_user():
+def del_user(username):
     conn = mysql.connect()
     cursor = conn.cursor()
 
