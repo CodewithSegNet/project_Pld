@@ -1,8 +1,9 @@
 import jwt
+import mysql.connector
 from flask import Flask, request, jsonify, g
-from datatime import datetime, timedelta
+from datetime import datetime, timedelta
 from functools import wraps
-from flaskext.mysql import MySQL
+import MySQLdb
 
 # Initialize flask app
 app = Flask(__name__)
@@ -14,19 +15,37 @@ app.config['MYSQL_DATABASE_DB'] = 'RECORDS'
 app.config['MYSQL_DATABASE_HOST'] = 'localhost'
 
 # Initialize MySQL
-mysql = MySQL(app)
+mysql = MySQLdb.connect(
+        user=app.config['MYSQL_DATABASE_USER'],
+        password=app.config['MYSQL_DATABASE_PASSWORD'],
+        host=app.config['MYSQL_DATABASE_HOST'],
+        db=app.config['MYSQL_DATABASE_DB']
+        )
 
 # In-memory store for user database
 users = []
 
 # Generate alternative usernames by appending numbers
 def suggest_username(username):
+    conn = mysql.connect()
+    cursor = conn.cursor()
+
     suggested_username =username
     counter = 1
-    while any(user['username'] == suggested_username for user in users):
-        suggested_username = f"{username}{counter}"
+    while True:
+        # check if the suggested username exists in the database
+        cursor.execute("SELECT * FROM user_profile WHERE username = %s", (suggested_username,))
+        if not cursor.fetchone():
+            # Found a unique username, exit the loop
+            break
+
+        # Username exists, try the next alternative
+        suggested_username = "{}{}".format(username, counter)
         counter += 1
-        return suggested_username
+    
+    cursor.close()
+    conn.close()
+    return suggested_username
 
 # Secret key for JWT encoding/decoding(!!!note: KEY should be taken seriouly)
 SECRET_KEY = 'secret-key'
@@ -60,10 +79,12 @@ def register():
         cursor.execute("SELECT * FROM user_profile WHERE username = %s", (username,))
         if cursor.fetchone():
             suggested_username = suggest_username(username)
-            return jsonify({"message": f"Username already taken, Try {suggest_username} instead"})
+            return jsonify({"message": "Username already taken, Try {} instead".format(suggest_username)})
         
         
         # Add New User Data into the database
+        conn = mysql.connector.connect(host='localhost', user='segun', password='', database='RECORDS')
+        cursor = conn.cursor()
         cursor.execute("INSERT INTO user_profile (first_name, middle_name, last_name, grad_year, username, password) VALUES (%s, %s, %s, %s, %s, %s)",
                 (first_name, middle_name, last_name, grad_year, username, password))
         conn.commit()
@@ -76,7 +97,7 @@ def register():
     
     except Exception as e:
         # Return an error response if an exception occurs
-        return jsonify({"error", str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 # route that handles User Login 
