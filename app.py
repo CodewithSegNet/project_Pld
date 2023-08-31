@@ -57,14 +57,14 @@ def register():
         cursor = conn.cursor()
 
         # Check if the username is already taken
-        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+        cursor.execute("SELECT * FROM user_profile WHERE username = %s", (username,))
         if cursor.fetchone():
             suggested_username = suggest_username(username)
             return jsonify({"message": f"Username already taken, Try {suggest_username} instead"})
         
         
         # Add New User Data into the database
-        cursor.execute("INSERT INTO users (first_name, middle_name, last_name, grad_year, username, password) VALUES (%s, %s, %s, %s, %s, %s)",
+        cursor.execute("INSERT INTO user_profile (first_name, middle_name, last_name, grad_year, username, password) VALUES (%s, %s, %s, %s, %s, %s)",
                 (first_name, middle_name, last_name, grad_year, username, password))
         conn.commit()
 
