@@ -16,6 +16,9 @@ app.config['MYSQL_DATABASE_HOST'] = 'localhost'
 # Initialize MySQL
 mysql = MySQL(app)
 
+# In-memory store for user database
+users = []
+
 # Generate alternative usernames by appending numbers
 def suggest_username(username):
     suggested_username =username
@@ -137,29 +140,36 @@ def update_user(username):
     data = request.json
 
     # check for user in database(Alumni database)
-        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
-            user = cursor.fetchone()
-            
-            if user:
-                # Update user data based on incoming JSON data
-                cursor.execute("UPDATE users SET first_name = %s, middle_name = %s, last_name = %s, grad_year = %s WHERE username = %s",
-                        data['first_name'], data['middle_name'], data['last_name'], data['grad_year'], username))
-                conn.commit()
-                cursor.close()
-                conn.close()
-                return jsonify({"message": "Update Successful!"}), 200
-            else:
-                cursor.close()
-                conn.close()
+    cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+    user = cursor.fetchone()
+    
+    if user:
+        # Update user data based on incoming JSON data
+        cursor.execute("UPDATE users SET first_name = %s, middle_name = %s, last_name = %s, grad_year = %s WHERE username = %s",
+                data['first_name'], data['middle_name'], data['last_name'], data['grad_year'], username))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({"message": "Update Successful!"}), 200
+    else:
+        cursor.close()
+        conn.close()
                 
-                # check for user in database(Alumni database)
-                return jsonify({"message": "User Not Found"}), 404
+        # check for user in database(Alumni database)
+        return jsonify({"message": "User Not Found"}), 404
 
 # route that handles deleting of user data based on username
 @app.route('/users/<username>', methods=['DELETE'])
 def del_user():
-    global users
-    users = [user for user in users if user['username'] != username]
+    conn = mysql.connect()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM users WHERE username = %s", (username,))
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
     return jsonify({"message": "User deleted successfully!"}), 200
 
 
