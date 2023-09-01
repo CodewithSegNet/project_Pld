@@ -1,34 +1,40 @@
 import jwt
-import mysql.connector
 from flask import Flask, request, jsonify, g
 from datetime import datetime, timedelta
 from functools import wraps
-import MySQLdb
+import mysql.connector
 
 # Initialize flask app
 app = Flask(__name__)
 
-# conf MySQL settings
-app.config['MYSQL_DATABASE_USER'] = 'segun'
-app.config['MYSQL_DATABASE_PASSWORD'] = ''
-app.config['MYSQL_DATABASE_DB'] = 'RECORDS'
-app.config['MYSQL_DATABASE_HOST'] = 'localhost'
-
 # Initialize MySQL
-mysql = MySQLdb.connect(
-        user=app.config['MYSQL_DATABASE_USER'],
-        password=app.config['MYSQL_DATABASE_PASSWORD'],
-        host=app.config['MYSQL_DATABASE_HOST'],
-        db=app.config['MYSQL_DATABASE_DB']
-        )
+db_config = {
+        "host": "localhost",
+        "user": "segun",
+        "password": "",
+        "database": "RECORDS",
+        }
 
-# In-memory store for user database
-users = []
+# Establish connection
+def get_database_connection():
+    if 'db' not in g:
+        g.db = mysql.connector.connect(**db_config)
+    return g.db
+
+# Close the cursor and connection when app close
+def close_database_connection(e=None):
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
+
+@app.teardown_appcontext
+def teardown_db(exception):
+    close_database_connection()
 
 # Generate alternative usernames by appending numbers
 def suggest_username(username):
-    conn = mysql.connect()
-    cursor = conn.cursor()
+    conn = get_database_connection()
+    cursor = conn.cursor(dictionary=True)
 
     suggested_username =username
     counter = 1
@@ -72,19 +78,19 @@ def register():
         username = data['username']
         password = data['password']
 
-        conn = mysql.connect()
-        cursor = conn.cursor()
+        conn = get_database_connection()
+        cursor = conn.cursor(dictionary=True)
 
         # Check if the username is already taken
         cursor.execute("SELECT * FROM user_profile WHERE username = %s", (username,))
         if cursor.fetchone():
             suggested_username = suggest_username(username)
-            return jsonify({"message": "Username already taken, Try {} instead".format(suggest_username)})
+            return jsonify({"message": "Username already taken, Try {} instead".format(suggested_username)})
         
         
         # Add New User Data into the database
         conn = mysql.connector.connect(host='localhost', user='segun', password='', database='RECORDS')
-        cursor = conn.cursor()
+        cursor = conn.cursor(dictionary=True)
         cursor.execute("INSERT INTO user_profile (first_name, middle_name, last_name, grad_year, username, password) VALUES (%s, %s, %s, %s, %s, %s)",
                 (first_name, middle_name, last_name, grad_year, username, password))
         conn.commit()
@@ -110,8 +116,8 @@ def login():
     username = data['username']
     password = data['password']
 
-    conn = mysql.connect()
-    cursor = conn.cursor()
+    conn = get_database_connection()
+    cursor = conn.cursor(dictionary=True)
 
     # Find User in Alumni database
     cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
@@ -134,8 +140,8 @@ def login():
 # route that handles retrieving user data based on username
 @app.route('/users/<username>', methods=['GET'])
 def get_user_by_username(username):
-    conn = mysql.connect()
-    cursor = conn.cursor()
+    conn = get_database_connection()
+    cursor = conn.cursor(dictionary=True)
 
     # Find User in Alumni database
     cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
@@ -154,8 +160,8 @@ def get_user_by_username(username):
 @app.route('/users/<username>', methods=['PUT'])
 def update_user(username):
     
-    conn = mysql.connect()
-    cursor = conn.cursor()
+    conn = get_database_connection()
+    cursor = conn.cursor(dictionary=True)
 
     # Get user json data from request body
     data = request.json
@@ -182,8 +188,8 @@ def update_user(username):
 # route that handles deleting of user data based on username
 @app.route('/users/<username>', methods=['DELETE'])
 def del_user(username):
-    conn = mysql.connect()
-    cursor = conn.cursor()
+    conn = get_database_connection()
+    cursor = conn.cursor(dictionary=True)
 
     cursor.execute("DELETE FROM users WHERE username = %s", (username,))
     conn.commit()
@@ -197,7 +203,17 @@ def del_user(username):
 # route for users(Alumni database)
 @app.route('/users', methods=['GET'])
 def get_users():
-    return jsonify(users)
+    conn = get_database_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # Retrieve all Users from the database
+    cursor.execute("SELECT * FROM user_profile")
+    users = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return jsonify(users), 200
 
 # Custom decorator to enforce authentication on routes
 def requires_auth(f):
