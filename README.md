@@ -6,7 +6,7 @@
 
 ## Database_system: MySQl
 
-0. [Agenda] (./app.py) :
+0. [AGENDA](./app.py) :
 
 - building a database using API endpoints with python backend `(Flask)`.
 - create route and views to handle `HTTP` requests and responses.
