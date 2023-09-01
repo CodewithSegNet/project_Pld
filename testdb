@@ -1,7 +1,0 @@
-conn = mysql.connect()
-cursor = conn.cursor()
-cursor.execute("SELECT 1")
-result = cursor.fetchone()
-print("Connected to the database:", result[0])
-cursor.close()
-conn.close()
